@@ -7,41 +7,45 @@ import * as jwt from 'jsonwebtoken';
 import { NextFunction } from 'connect';
 
 import * as EmailValidator from 'email-validator';
+import { config } from '../../../../config/config';
 
 const router: Router = Router();
+const LOG_FILE: string = "auth.router.ts ";
 
 async function generatePassword(plainTextPassword: string): Promise<string> {
-    //@TODO Use Bcrypt to Generated Salted Hashed Passwords
+    const saltRounds = 10;
+    const salt = await bcrypt.genSalt (saltRounds);
+    return await bcrypt.hash(plainTextPassword, saltRounds);
 }
 
 async function comparePasswords(plainTextPassword: string, hash: string): Promise<boolean> {
-    //@TODO Use Bcrypt to Compare your password to your Salted Hashed Password
+    return await bcrypt.compare (plainTextPassword, hash);
 }
 
 function generateJWT(user: User): string {
-    //@TODO Use jwt to create a new JWT Payload containing
+    return jwt.sign(user.toJSON(), config.jwt.secret);
 }
 
 export function requireAuth(req: Request, res: Response, next: NextFunction) {
-    return next();
-    // if (!req.headers || !req.headers.authorization){
-    //     return res.status(401).send({ message: 'No authorization headers.' });
-    // }
+    console.log(LOG_FILE + "Called requireAuth")
+    if (!req.headers || !req.headers.authorization){
+        return res.status(401).send({ message: 'No authorization headers.' });
+    }
     
-
-    // const token_bearer = req.headers.authorization.split(' ');
-    // if(token_bearer.length != 2){
-    //     return res.status(401).send({ message: 'Malformed token.' });
-    // }
+    const token_bearer = req.headers.authorization.split(' ');
+    if(token_bearer.length != 2){
+        return res.status(401).send({ message: 'Malformed token.' });
+    }
     
-    // const token = token_bearer[1];
+    const token = token_bearer[1];
 
-    // return jwt.verify(token, "hello", (err, decoded) => {
-    //   if (err) {
-    //     return res.status(500).send({ auth: false, message: 'Failed to authenticate.' });
-    //   }
-    //   return next();
-    // });
+    return jwt.verify(token, config.jwt.secret, (err, decoded) => {
+      if (err) {
+        return res.status(500).send({ auth: false, message: 'Failed to authenticate.' });
+      }
+      console.log(LOG_FILE + "RequireAuth successfull.")
+      return next();
+    });
 }
 
 router.get('/verification', 
@@ -53,6 +57,9 @@ router.get('/verification',
 router.post('/login', async (req: Request, res: Response) => {
     const email = req.body.email;
     const password = req.body.password;
+
+    console.log (LOG_FILE + "User trying to log in.")
+
     // check email is valid
     if (!email || !EmailValidator.validate(email)) {
         return res.status(400).send({ auth: false, message: 'Email is required or malformed' });
@@ -66,6 +73,7 @@ router.post('/login', async (req: Request, res: Response) => {
     const user = await User.findByPk(email);
     // check that user exists
     if(!user) {
+        console.log (LOG_FILE + "User tried to log in with email " + email + ". This email does not exist in database.")
         return res.status(401).send({ auth: false, message: 'Unauthorized' });
     }
 
@@ -73,11 +81,14 @@ router.post('/login', async (req: Request, res: Response) => {
     const authValid = await comparePasswords(password, user.password_hash)
 
     if(!authValid) {
+        console.log (LOG_FILE + "User tried to log in with email " + email + ". Email exists, but password does not match.")
         return res.status(401).send({ auth: false, message: 'Unauthorized' });
     }
 
     // Generate JWT
     const jwt = generateJWT(user);
+
+    console.log (LOG_FILE + "User logged in successfully. Sending jwt token: " + jwt)
 
     res.status(200).send({ auth: true, token: jwt, user: user.short()});
 });
@@ -86,6 +97,9 @@ router.post('/login', async (req: Request, res: Response) => {
 router.post('/', async (req: Request, res: Response) => {
     const email = req.body.email;
     const plainTextPassword = req.body.password;
+
+    console.log (LOG_FILE + "Client requesting to register a new user")
+
     // check email is valid
     if (!email || !EmailValidator.validate(email)) {
         return res.status(400).send({ auth: false, message: 'Email is required or malformed' });
@@ -100,6 +114,8 @@ router.post('/', async (req: Request, res: Response) => {
     const user = await User.findByPk(email);
     // check that user doesnt exists
     if(user) {
+        console.log (LOG_FILE + "User already exists. Cannot register with this email.")
+
         return res.status(422).send({ auth: false, message: 'User may already exist' });
     }
 
@@ -113,12 +129,15 @@ router.post('/', async (req: Request, res: Response) => {
     let savedUser;
     try {
         savedUser = await newUser.save();
+        console.log (LOG_FILE + "New user registered with email: " + email)
     } catch (e) {
         throw e;
     }
 
     // Generate JWT
     const jwt = generateJWT(savedUser);
+
+    console.log (LOG_FILE + "New user jwt token: " + jwt)
 
     res.status(201).send({token: jwt, user: savedUser.short()});
 });

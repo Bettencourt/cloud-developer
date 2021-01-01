@@ -1,13 +1,13 @@
 export const config = {
   "dev": {
-    "username": "",
-    "password": "",
-    "database": "",
-    "host": "",
+    "username": process.env.UDACITY_POSTGRESS_USERNAME,
+    "password": process.env.UDACITY_POSTGRESS_PASSWORD,
+    "database": process.env.UDACITY_POSTGRESS_DATABASE,
+    "host": process.env.UDACITY_POSTGRESS_HOST,
     "dialect": "postgres",
-    "aws_region": "us-east-2",
-    "aws_profile": "default",
-    "aws_media_bucket": "udagram-ruttner-dev"
+    "aws_region": process.env.UDACITY_AWS_REGION,
+    "aws_profile": process.env.UDACITY_AWS_PROFILE,
+    "aws_media_bucket": process.env.UDACITY_AWS_MEDIA_BUCKET
   },
   "prod": {
     "username": "",
@@ -15,5 +15,8 @@ export const config = {
     "database": "udagram_prod",
     "host": "",
     "dialect": "postgres"
+  },
+  "jwt": {
+    "secret": process.env.JWT_SECRET
   }
 }

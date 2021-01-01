@@ -4,27 +4,77 @@ import { requireAuth } from '../../users/routes/auth.router';
 import * as AWS from '../../../../aws';
 
 const router: Router = Router();
+const LOG_FILE: string = "feed.router.ts ";
 
 // Get all feed items
 router.get('/', async (req: Request, res: Response) => {
     const items = await FeedItem.findAndCountAll({order: [['id', 'DESC']]});
     items.rows.map((item) => {
             if(item.url) {
+                console.log(LOG_FILE + "Trying to obtain a signed url for file " + item.url)
                 item.url = AWS.getGetSignedUrl(item.url);
             }
     });
     res.send(items);
 });
 
-//@TODO
 //Add an endpoint to GET a specific resource by Primary Key
+router.get('/:id', async (req: Request, res: Response) => {
+
+    let { id } = req.params;
+
+    if ( !id ) {
+      return res.status(400).send(`id is required`);
+    }
+
+    try {
+        const item = await FeedItem.findByPk(id);
+
+        if(item.url) {
+            item.url = AWS.getGetSignedUrl(item.url);
+            res.status(201).send(item);
+        }
+    } catch (Error) {
+        return res.status(400).send(`id does not exist`);
+    }
+});
 
 // update a specific resource
-router.patch('/:id', 
-    requireAuth, 
-    async (req: Request, res: Response) => {
-        //@TODO try it yourself
-        res.send(500).send("not implemented")
+router.patch('/:id',
+requireAuth,
+async (req: Request, res: Response) => {
+    console.log (LOG_FILE + "Calling patch.");
+    let { id } = req.params;
+
+    // Check to see if id exists
+    const caption = req.body.caption;
+    const fileName = req.body.url;
+
+    // check Caption is valid
+    if (!caption) {
+        return res.status(400).send({ message: 'Caption is required or malformed' });
+    }
+
+    // check Filename is valid
+    if (!fileName) {
+        return res.status(400).send({ message: 'File url is required' });
+    }
+
+    try {
+        const item = await FeedItem.findByPk(id);
+
+        console.log(LOG_FILE + "Updating item nr. " + item.id);
+        console.log(LOG_FILE + "Filename is " + fileName);
+
+        if(item.url) {
+            item.update({caption: caption, url: fileName});
+            // item.url = AWS.getPutSignedUrl(fileName);
+            const saved_item = await item.save();
+            res.status(201).send(saved_item);
+        }
+    } catch (Error) {
+        return res.status(400).send(`id does not exist`);
+    }
 });
 
 
