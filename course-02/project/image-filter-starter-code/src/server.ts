@@ -8,7 +8,7 @@ import {filterImageFromURL, deleteLocalFiles} from './util/util';
   const app = express();
 
   // Set the network port
-  const port = process.env.PORT || 8082;
+  const port = process.env.UDACITY_IMAGEFILTER_PORT || 8082;
   
   // Use the body parser middleware for post requests
   app.use(bodyParser.json());
@@ -18,10 +18,6 @@ import {filterImageFromURL, deleteLocalFiles} from './util/util';
   // endpoint to filter an image from a public url.
   // IT SHOULD
   //    1
-  //    1. validate the image_url query
-  //    2. call filterImageFromURL(image_url) to filter the image
-  //    3. send the resulting file in the response
-  //    4. deletes any files on the server on finish of the response
   // QUERY PARAMATERS
   //    image_url: URL of a publicly accessible image
   // RETURNS
@@ -34,9 +30,35 @@ import {filterImageFromURL, deleteLocalFiles} from './util/util';
   // Root Endpoint
   // Displays a simple message to the user
   app.get( "/", async ( req, res ) => {
-    res.send("try GET /filteredimage?image_url={{}}")
+    res.send("try GET /filteredimage?image_url={{}}");
   } );
   
+  app.get( "/filteredimage", async (req, res) => {
+    
+    let { image_url } = req.query;
+
+    //    1. validate the image_url query
+    if ( !image_url ) {
+      return res.status(400)
+                .send(`parameter image_url is required`);
+    }
+
+    //    2. call filterImageFromURL(image_url) to filter the image
+    const result: string = await filterImageFromURL(image_url);
+
+    console.log ("Result of filterImageFromURL function: " + result);
+
+    //    3. send the resulting file in the response
+    return res.status(200).sendFile(result, function (err) {
+    //    4. deletes any files on the server on finish of the response
+    try {
+        const files: string[] = [result];
+        deleteLocalFiles(files);
+      } catch(e) {
+        console.log("error removing ", result); 
+      }
+    });
+});
 
   // Start the Server
   app.listen( port, () => {
